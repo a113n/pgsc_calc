@@ -7,7 +7,7 @@ include { FORMAT_SCOREFILES } from '../../modules/local/format_scorefiles'
 
 workflow INPUT_CHECK {
     take:
-    input_path // file: /path/to/samplesheet.csv
+    input_path // file: /path/to/samplesheet.csv (can be a path string or channel)
     format // csv or JSON
     scorefile // flat list of paths
     chain_files
@@ -27,27 +27,51 @@ workflow INPUT_CHECK {
     ch_versions = Channel.empty()
     parsed_input = Channel.empty()
 
-    input = Channel.fromPath(input_path, checkIfExists: true)
+    input = input_path
 
     if (format.equals("csv")) {
         def n_chrom
-        n_chrom = file(input_path).countLines() - 1 // ignore header
-        parser = new SamplesheetParser(file(input_path), n_chrom, params.target_build)
-        input.splitCsv(header:true)
+        def samplesheet_path
+        
+        // Handle both channel and path inputs
+        input_path.map { csv_file ->
+            n_chrom = csv_file.countLines() - 1
+            samplesheet_path = csv_file
+            parser = new SamplesheetParser(csv_file, n_chrom, params.target_build)
+            return csv_file
+        }
+        .splitCsv(header:true)
                 .collect()
-                .map { rows -> parser.verifySamplesheet(rows) }
+                .map { rows -> 
+                    def p = new SamplesheetParser(samplesheet_path, n_chrom, params.target_build)
+                    p.verifySamplesheet(rows) 
+                }
                 .flatten()
-                .map { row -> parser.parseCSVRow(row)}
+                .map { row -> 
+                    def p = new SamplesheetParser(samplesheet_path, n_chrom, params.target_build)
+                    p.parseCSVRow(row)
+                }
                 .set { parsed_input }
     } else if (format.equals("json")) {
         def n_chrom
-        n_chrom = file(input_path).countJson()
-        parser = new SamplesheetParser(file(input_path), n_chrom, params.target_build)
-        input.splitJson()
+        def samplesheet_path
+        
+        input_path.map { json_file ->
+            n_chrom = json_file.countJson()
+            samplesheet_path = json_file
+            return json_file
+        }
+        .splitJson()
             .collect()
-            .map { jsonarray -> parser.verifySamplesheet(jsonarray)}
+            .map { jsonarray -> 
+                def p = new SamplesheetParser(samplesheet_path, n_chrom, params.target_build)
+                p.verifySamplesheet(jsonarray)
+            }
             .flatten()
-            .map { json -> parser.parseJSON(json)}
+            .map { json -> 
+                def p = new SamplesheetParser(samplesheet_path, n_chrom, params.target_build)
+                p.parseJSON(json)
+            }
             .set { parsed_input }
     }
 

@@ -82,10 +82,14 @@ workflow REPORT {
         .combine(log_scorefiles) // all samplesets have the same scorefile metadata
         .set { ch_report_input }
 
-    Channel.fromPath([file(projectDir / "assets" /"report" / "report.qmd", checkIfExists: true),
-        file(projectDir / "assets" /"report" / "logo.css", checkIfExists: true),
-        file(projectDir / "assets" /"report" / "PGS_Logo.png", checkIfExists: true),
-        file(projectDir / "assets" /"report" / "pgs_header_background.png", checkIfExists: true)])
+    // Use workflow.projectDir to get pgsc_calc's actual location
+    def pgsc_dir = workflow.projectDir.toString().contains('codex-fq2gvcf') ? 
+        workflow.projectDir.getParent().resolve('pgsc_calc') : workflow.projectDir
+    
+    Channel.fromPath([file(pgsc_dir / "assets" /"report" / "report.qmd", checkIfExists: true),
+        file(pgsc_dir / "assets" /"report" / "logo.css", checkIfExists: true),
+        file(pgsc_dir / "assets" /"report" / "PGS_Logo.png", checkIfExists: true),
+        file(pgsc_dir / "assets" /"report" / "pgs_header_background.png", checkIfExists: true)])
       .collect()
       .set{ report_path }
 
