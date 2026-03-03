@@ -39,10 +39,8 @@ workflow INPUT_CHECK {
             .groupTuple()
             .map { meta, rows ->
                 def p = new SamplesheetParser(meta.samplesheet_path, meta.n_chrom as Integer, params.target_build)
-                def samplesheet_token = Integer.toHexString(meta.samplesheet_path.toString().hashCode())
                 p.verifySamplesheet(rows).collect { row ->
                     def parsed = p.parseCSVRow(row)
-                    parsed[0].id = "${parsed[0].id}-${samplesheet_token}"
                     return parsed
                 }
             }
@@ -58,10 +56,8 @@ workflow INPUT_CHECK {
             .groupTuple()
             .map { meta, jsonarray ->
                 def p = new SamplesheetParser(meta.samplesheet_path, meta.n_chrom as Integer, params.target_build)
-                def samplesheet_token = Integer.toHexString(meta.samplesheet_path.toString().hashCode())
                 p.verifySamplesheet(jsonarray).collect { json ->
                     def parsed = p.parseJSON(json)
-                    parsed[0].id = "${parsed[0].id}-${samplesheet_token}"
                     return parsed
                 }
             }

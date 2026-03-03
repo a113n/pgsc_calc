@@ -2,6 +2,7 @@ process ANCESTRY_ANALYSIS {
     // labels are defined in conf/modules.config
     label 'process_low'
     label 'pgscatalog_utils' // controls conda, docker, + singularity options
+    tag "${meta.target_id ?: meta.id}"
 
     conda "${task.ext.conda}"
 
@@ -20,8 +21,9 @@ process ANCESTRY_ANALYSIS {
     path "versions.yml", emit: versions
 
     script:
+    def dataset_id = meta.target_id ?: meta.id
     """
-    pgscatalog-ancestry-adjust -d $meta.target_id \
+    pgscatalog-ancestry-adjust -d $dataset_id \
         -r reference \
         --psam $ref_psam \
         --ref_pcs ref_pcs/1.pcs \

@@ -23,41 +23,28 @@ workflow MATCH {
     MATCH_VARIANTS ( ch_variants )
     ch_versions = ch_versions.mix(MATCH_VARIANTS.out.versions.first())
 
-    // groupTuple() notes:
-    // removed custom groupKeys because only one group will ever be processed
-    // (1 sampleset limitation added for v2 release)
-    // so groupTuple's size parameter isn't needed in this subworkflow
-
-    // use multiMaps + concat to preserve lists of files after concatenating
-    // joining or combining can create nested lists (annoying to handle)
+    // build MATCH_COMBINE inputs per sampleset ID (supports multi-sampleset runs)
     MATCH_VARIANTS.out.matches
-        .multiMap {
-            meta: it.first()
-            matches: it.last()
+        .map { meta, match_path -> tuple(meta.subMap('id'), meta, match_path) }
+        .groupTuple()
+        .map { id_meta, metas, matches ->
+            def split = metas.first().chrom != 'ALL'
+            tuple(id_meta, [id: id_meta.id, split: split], matches)
         }
-        .set { ch_matches }
+        .set { ch_matches_grouped }
 
     ch_intersection
+        .map { meta, shared_path -> tuple(meta.subMap('id'), shared_path) }
         .groupTuple()
-        .multiMap {
-            meta: it.first()
-            intersections: it.last()
-        }
         .set { ch_intersection_grouped }
 
-    // only meta.chrom is checked to see if it's set to 'ALL' or not
-    // but using chrom values directly in meta map breaks cache because chrom order can differ across runs
-    ch_matches.meta.first().map { it ->
-        def split = it.chrom != "ALL"
-        return [split:split, id: it.id]
-    }.set { combine_meta }
-
-    combine_meta
-        .concat( ch_matches.matches.collect() )
-        .concat( scorefile )
-        .concat( ch_intersection_grouped.intersections.collect() )
-        .buffer( size: 4 )
-        .dump ( tag: 'match_combine_input', pretty: true )
+    ch_matches_grouped
+        .join(ch_intersection_grouped, by: 0)
+        .combine(scorefiles)
+        .map { id_meta, combine_meta, matches, intersections, all_scorefiles ->
+            tuple(combine_meta, matches, all_scorefiles.flatten(), intersections)
+        }
+        .dump(tag: 'match_combine_input', pretty: true)
         .set { ch_match_combine_input }
 
      MATCH_COMBINE ( ch_match_combine_input )
