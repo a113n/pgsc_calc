@@ -20,16 +20,16 @@ process FILTER_VARIANTS {
         path(ld), path(king)
 
     output:
-    tuple val(build), path("*_reference.pgen"), path("*_reference.psam"), path("*_reference.pvar.zst"), emit: ref
-    path("*thinned.prune.in.gz"), emit: prune_in
-    path("*.afreq.zst"), emit: afreq
+    tuple val(build), path("${params.target_build}_${meta.id}_reference.pgen"), path("${params.target_build}_${meta.id}_reference.psam"), path("${params.target_build}_${meta.id}_reference.pvar.zst"), emit: ref
+    tuple val(build), path("${ref_geno.simpleName}_${meta.id}_thinned.prune.in.gz"), emit: prune_in
+    tuple val(build), path("${params.target_build}_${meta.id}_reference.afreq.zst"), emit: afreq
     path "versions.yml", emit: versions
 
     script:
     def mem_mb = task.memory.toMega() // plink is greedy
     // dynamic input option
     def input = (meta.is_pfile) ? '--pfile vzs' : '--bfile vzs'
-    build = ['build': params.target_build]
+    build = ['build': params.target_build, 'id': meta.id]
     """
     # 1. Get QC'd variant set & unrelated samples from REFERENCE data for PCA --
 
@@ -52,17 +52,17 @@ process FILTER_VARIANTS {
             --make-pgen vzs \
             --allow-extra-chr --autosome \
             --freq zs \
-            --out ${params.target_build}_reference
+            --out ${params.target_build}_${meta.id}_reference
 
     # 2. LD-thin variants in REFERENCE (filtered variants & samples) for input
     # into PCA -----------------------------------------------------------------
     plink2 \
             --threads $task.cpus \
             --memory $mem_mb \
-            --pfile vzs ${params.target_build}_reference \
+            --pfile vzs ${params.target_build}_${meta.id}_reference \
             --indep-pairwise $params.indep_pairwise_ref \
             --exclude range $ld \
-            --out ${ref_geno.simpleName}_thinned
+            --out ${ref_geno.simpleName}_${meta.id}_thinned
 
     gzip -f *.prune.in *.prune.out
 

@@ -25,7 +25,8 @@ process FRAPOSA_PCA {
     path "versions.yml", emit: versions
 
     script:
-    output = "${params.target_build}_${meta.id}"
+    def ref_id = meta.containsKey('target_id') ? "${meta.id}_${meta.target_id}" : "${meta.id}"
+    output = "${params.target_build}_${ref_id}"
     """
     fraposa ${ref_geno.baseName} \
         --method $params.projection_method \

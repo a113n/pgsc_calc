@@ -19,7 +19,7 @@ process PLINK2_SCORE {
 
     output:
     tuple val(outmeta), path("${output}.{sscore,sscore.zst}"), emit: scores  // optional compression
-    path "${output}.sscore.vars", emit: vars_scored
+    tuple val(outmeta), path("${output}.sscore.vars"), emit: vars_scored
     path "${output}.log", emit: log
     path "versions.yml", emit: versions
 
@@ -48,7 +48,7 @@ process PLINK2_SCORE {
     def recessive = (scoremeta.effect_type == 'recessive') ? ' recessive ' : ''
     def dominant = (scoremeta.effect_type == 'dominant') ? ' dominant ' : ''
     args2 = [args2, cols, 'list-variants', no_imputation, recessive, dominant, error_on_freq_calc].join(' ')
-    outmeta = meta + ["n": scoremeta.n, "effect_type": scoremeta.effect_type]
+    outmeta = meta + ["n": scoremeta.n, "effect_type": scoremeta.effect_type, "target_id": scoremeta.id]
     output = "${meta.id}_${meta.chrom}_${scoremeta.effect_type}_${scoremeta.n}"
     // speed up the calculation by only considering scoring-file variants for allele frequency calculation (--extract)
     if (scoremeta.n_scores.toInteger() == 1)

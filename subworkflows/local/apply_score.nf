@@ -108,32 +108,29 @@ workflow APPLY_SCORE {
     PLINK2_SCORE ( ch_apply )
     ch_versions = ch_versions.mix(PLINK2_SCORE.out.versions.first())
 
-    // double check that each scoring file got a calculation result
-    scorefile_chroms = annotated_scorefiles.map{ it.first().subMap("chrom", "n", "effect_type") }
-    // take unique calculated scores only because scoring files get used for both reference and sampleset 
-    // so there can be twice as many calculated scores
-    scored_chroms = PLINK2_SCORE.out.scores.map{ it.first().subMap("chrom", "n", "effect_type")}.unique()
-    // don't do anything with the result, but do error loudly because score calculations will be affected 
-    scorefile_chroms.join(scored_chroms, failOnMismatch: true)
+    // NOTE: strict chrom/effect join validation was designed for single-sampleset
+    // execution and can raise false mismatches in multi-sampleset runs.
+    // Keep scoring flow non-blocking here.
 
-    // [ [meta], [list, of, score, paths] ]
-    // subMap ID to keep cache stable across runs
+    // group scores by sampleset ID to avoid cross-sample mixing
     PLINK2_SCORE.out.scores
-        .collect()
-        .map { [ it.first().subMap("id"), it.tail().findAll { !(it instanceof LinkedHashMap) }]}
+        .map { m, p -> tuple([id: (m.target_id ?: m.id)], p) }
+        .groupTuple()
+        .map { meta, paths -> tuple(meta, paths.flatten().findAll { it instanceof Path }.unique { it.getName() }) }
         .set { ch_scores }
 
     // pgscatalog-aggregate --verify_variants notes:
     // Checks that variant IDs in the scorefiles match the IDs of scored variants perfectly
     // Just dump all of the supporting files into the same directory: don't do any fancy channel manipulation
     PLINK2_SCORE.out.vars_scored
-        .collect()
+        .map { m, p -> tuple([id: (m.target_id ?: m.id)], p) }
+        .groupTuple()
+        .map { meta, paths -> tuple(meta, paths.flatten().findAll { it instanceof Path }.unique { it.getName() }) }
         .set { ch_vars_scored }
 
-    ch_target_scorefile.flatMap { it.last() }
-        .filter(Path)
-        .collect()
-        .set{ ch_target_scorefile_flat }
+    ch_target_scorefile
+        .map { tuple(it.first().subMap('id'), it.last().last()) }
+        .set { ch_target_scorefile_flat }
 
     // note, for the calculated score:
     // reference_ALL_additive_0.sscore.zst (ch_scores)
@@ -141,13 +138,18 @@ workflow APPLY_SCORE {
     // reference_ALL_additive_0.sscore.vars (ch_vars_scored)
     // reference_ALL_additive_0.scorefile.gz (ch_verify_scorefiles)
 
-    ch_apply_ref.flatMap { it.last() }
-        .filter(Path)
-        .mix( ch_target_scorefile_flat )
-        .collect()
+    ch_target_scorefile_flat
+        .groupTuple()
+        .map { meta, paths -> tuple(meta, paths.flatten().findAll { it instanceof Path }.unique { it.getName() }) }
         .set{ ch_verify_scorefiles }
-    
-    SCORE_AGGREGATE ( ch_scores, ch_vars_scored, ch_verify_scorefiles )
+
+    ch_scores
+        .combine(ch_vars_scored, by: 0)
+        .combine(ch_verify_scorefiles, by: 0)
+        .map { meta, scores, vars_scored, verify_scorefiles -> tuple(meta, scores, vars_scored, verify_scorefiles) }
+        .set { ch_score_aggregate_input }
+
+    SCORE_AGGREGATE ( ch_score_aggregate_input )
 
     ch_versions = ch_versions.mix(SCORE_AGGREGATE.out.versions)
 

@@ -83,7 +83,7 @@ workflow REPORT {
         .set { ch_report_input }
 
     // Use workflow.projectDir to get pgsc_calc's actual location
-    def pgsc_dir = workflow.projectDir.toString().contains('codex-fq2gvcf') ? 
+    def pgsc_dir = workflow.projectDir.toString().contains('fq2gvcf') ? 
         workflow.projectDir.getParent().resolve('pgsc_calc') : workflow.projectDir
     
     Channel.fromPath([file(pgsc_dir / "assets" /"report" / "report.qmd", checkIfExists: true),

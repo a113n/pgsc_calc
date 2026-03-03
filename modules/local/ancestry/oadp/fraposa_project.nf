@@ -17,7 +17,7 @@ process FRAPOSA_PROJECT {
 
     input:
     tuple val(meta), path(ref_geno), path(ref_pheno), path(ref_variants),
-        path(target_geno), path(target_pheno), path(target_variants), path(split_fam),
+        path(target_geno), path(target_pheno), path(target_variants), path(split_fam, stageAs: 'split_fam.txt'),
         path(pca)
 
     output:
@@ -29,6 +29,9 @@ process FRAPOSA_PROJECT {
     oadp_meta = ['target_id':target_id]
     output = "${target_geno.baseName}_${split_fam}"
     """
+    mkdir -p .mplconfig
+    export MPLCONFIGDIR="\$PWD/.mplconfig"
+
     fraposa ${ref_geno.baseName} \
         --method $params.projection_method \
         --dim_ref 10 \
